@@ -25,3 +25,4 @@ menu "Example Configuration"
             Define the I2C clock frequency in Hz.
 
 endmenu
+

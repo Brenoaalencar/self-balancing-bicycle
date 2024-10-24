@@ -1,4 +1,4 @@
-# Install script for directory: C:/Users/Breno Alencar/Documents/Insper/Estudos/Pesquisa/firmware/firmware_bicycle/self-balanced-bicycle/main
+# Install script for directory: C:/Users/Breno Alencar/Documents/Insper/Estudos/Pesquisa/firmware/self-balanced-bicycle/main
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)

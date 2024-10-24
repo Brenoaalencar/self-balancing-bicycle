@@ -1,4 +1,4 @@
-/* * Data converted from C:/Users/Breno Alencar/Documents/Insper/Estudos/Pesquisa/firmware/firmware_bicycle/self-balanced-bicycle/build/esp-idf/mbedtls/x509_crt_bundle
+/* * Data converted from C:/Users/Breno Alencar/Documents/Insper/Estudos/Pesquisa/firmware/self-balanced-bicycle/build/esp-idf/mbedtls/x509_crt_bundle
  */
 .data
 .section .rodata.embedded

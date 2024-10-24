@@ -10,11 +10,13 @@
 #include "esp_system.h"
 #include "esp_log.h"
 #include <math.h>
+#include "esp_camera.h"
 
 
 //Custom libs
 #include "../components/i2c_bus.h"
 #include "../components/imu.h"
+//#include "../components/servo.h"
 
 //GPIOs define
 
