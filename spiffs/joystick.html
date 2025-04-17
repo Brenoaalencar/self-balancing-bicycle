@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Joystick do Robô</title>
+  <style>
+    body {
+      background-color: #1e1e2f;
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      font-family: Arial, sans-serif;
+    }
+
+    #joystick-container {
+      width: 300px;
+      height: 300px;
+      background-color: #2e2e3e;
+      border: 2px solid #444;
+      border-radius: 50%;
+      position: relative;
+    }
+
+    #output {
+      position: absolute;
+      bottom: -60px;
+      width: 100%;
+      text-align: center;
+      font-size: 14px;
+      color: #0f0;
+    }
+  </style>
+</head>
+<body>
+  <div id="joystick-container">
+    <div id="output">{"command":"movement", "value":[0,0]}</div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.9.0/nipplejs.min.js"></script>
+
+  <script>
+    const joystickContainer = document.getElementById('joystick-container');
+    const output = document.getElementById('output');
+
+    const joystick = nipplejs.create({
+      zone: joystickContainer,
+      mode: 'static',
+      position: { left: '50%', top: '50%' },
+      color: 'green',
+      size: 200,
+    });
+
+    function sendCommand(command) {
+      fetch("/movement", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(command)
+      }).catch(err => {
+        console.error("Erro ao enviar comando:", err);
+      });
+    }
+
+    joystick.on('move', function (evt, data) {
+      let alfa_d = 0;
+      let y_d = 0;
+
+      if (data && data.angle) {
+        const angle = data.angle.degree;
+        const distance = Math.min(data.distance, 100) / 100;
+
+        if (angle >= 45 && angle <= 135) y_d = distance;
+        else if (angle >= 225 && angle <= 315) y_d = -distance;
+
+        if (angle >= 315 || angle <= 45) alfa_d = distance;
+        else if (angle >= 135 && angle <= 225) alfa_d = -distance;
+
+        if ((angle > 45 && angle < 135) || (angle > 225 && angle < 315)) {
+          const rad = angle * Math.PI / 180;
+          alfa_d = Math.cos(rad) * distance;
+          y_d = Math.sin(rad) * distance;
+        }
+      }
+
+      const command = {
+        command: "movement",
+        value: [Number(alfa_d.toFixed(2)), Number(y_d.toFixed(2))]
+      };
+
+      output.textContent = JSON.stringify(command);
+      sendCommand(command);
+    });
+
+    joystick.on('end', function () {
+      const command = {
+        command: "movement",
+        value: [0, 0]
+      };
+      output.textContent = JSON.stringify(command);
+      sendCommand(command);
+    });
+  </script>
+</body>
+</html>

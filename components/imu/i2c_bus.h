@@ -34,13 +34,24 @@ static esp_err_t mpu9250_register_read(uint8_t reg_addr, uint8_t *data, size_t l
  */
 static esp_err_t mpu9250_register_write_byte(uint8_t reg_addr, uint8_t data)
 {
-    int ret;
     uint8_t write_buf[2] = {reg_addr, data};
 
-    ret = i2c_master_write_to_device((i2c_port_t)I2C_MASTER_NUM, MPU9250_SENSOR_ADDR, write_buf, sizeof(write_buf), I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
+    esp_err_t ret = i2c_master_write_to_device(
+        (i2c_port_t)I2C_MASTER_NUM,
+        MPU9250_SENSOR_ADDR,
+        write_buf,
+        sizeof(write_buf),
+        I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS
+    );
+
+    if (ret != ESP_OK) {
+        // Loga um aviso caso ocorra erro, sem reiniciar o dispositivo
+        ESP_LOGW("MPU9250", "Failed to write byte to register 0x%02X: error 0x%X", reg_addr, ret);
+    }
 
     return ret;
 }
+
 
 /**
  * @brief i2c master initialization

@@ -38,6 +38,9 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
+#include "esp_task_wdt.h"  // Incluir biblioteca para manipular o watchdog
+#define CHUNK_SIZE 256  // Tamanho do bloco a ser enviado
+
 // support IDF 5.x
 #ifndef portTICK_RATE_MS
 #define portTICK_RATE_MS portTICK_PERIOD_MS
@@ -154,21 +157,48 @@ extern "C" void app_main()
     }
 
     while (1)
-    {
-        ESP_LOGI(TAG, "Taking picture...");
-        camera_fb_t *pic = esp_camera_fb_get();
+{
+    ESP_LOGI(TAG, "Taking picture...");
+    camera_fb_t *pic = esp_camera_fb_get();
 
-        // use pic->buf to access the image
-        ESP_LOGI(TAG, "Picture taken! Its size was: %zu bytes", pic->len);
-        for (size_t i = 0; i < pic->len; i++)
-            {
-                ESP_LOGI(TAG, "Byte[%zu]: %02X", i, pic->buf[i]);
-            }
-
-        esp_camera_fb_return(pic);
-
-        vTaskDelay(5000 / portTICK_RATE_MS);
+    if (!pic) {
+        ESP_LOGE(TAG, "Failed to capture image");
+        continue;
     }
+
+    ESP_LOGI(TAG, "Picture taken! Its size was: %zu bytes", pic->len);
+
+    // Alocar buffer para armazenar a imagem em formato hexadecimal
+    char *buffer = (char *)malloc((CHUNK_SIZE * 3) + 1); // Espaço para cada byte + '\0'
+    if (!buffer) {
+        ESP_LOGE(TAG, "Memory allocation for buffer failed");
+        esp_camera_fb_return(pic);
+        continue;
+    }
+
+    // Processamento e envio em blocos
+    for (size_t i = 0; i < pic->len; i += CHUNK_SIZE) {
+        size_t chunk_len = ((i + CHUNK_SIZE) < pic->len) ? CHUNK_SIZE : (pic->len - i);
+        size_t index = 0;
+
+        // Monta o bloco atual
+        for (size_t j = 0; j < chunk_len; j++) {
+            index += sprintf(&buffer[index], "%02X ", pic->buf[i + j]);
+        }
+
+        // Enviar o bloco atual via serial
+        ESP_LOGI(TAG, "Image data chunk: %s", buffer);
+
+        // Dar um pequeno intervalo para "alimentar" o watchdog
+        vTaskDelay(1 / portTICK_RATE_MS);
+    }
+
+    // Libera memória do buffer e retorna a imagem à câmera
+    free(buffer);
+    esp_camera_fb_return(pic);
+
+    vTaskDelay(5000 / portTICK_RATE_MS);
+}
 #else
     ESP_LOGE(TAG, "Camera support is not available for this chip");
     return;
