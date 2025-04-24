@@ -10,12 +10,41 @@
 #include "cJSON.h"
 #include <string.h>
 #include <stdio.h>
+#include "driver/gpio.h"
+
 
 #define WIFI_SSID ""
 #define WIFI_PASS ""
 static const char *TAG = "Communication";
 
 static Communication *singleton = nullptr;
+bool wifi_connected = false;  // Flag de conexão
+
+#define LED_GPIO GPIO_NUM_4
+
+void led_task(void *param) {
+    gpio_config_t io_conf = {
+        .pin_bit_mask = 1ULL << LED_GPIO,
+        .mode = GPIO_MODE_OUTPUT,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE
+    };
+    gpio_config(&io_conf);
+
+    while (true) {
+        if (!wifi_connected) {
+            gpio_set_level(LED_GPIO, 1);
+            vTaskDelay(pdMS_TO_TICKS(100));
+            gpio_set_level(LED_GPIO, 0);
+            vTaskDelay(pdMS_TO_TICKS(100));
+        } else {
+            gpio_set_level(LED_GPIO, 0);
+            vTaskDelay(pdMS_TO_TICKS(500)); // Checagem menos frequente quando conectado
+        }
+    }
+}
+
 
 // HTML handler
 static esp_err_t html_handler(httpd_req_t *req) {
@@ -74,6 +103,19 @@ static esp_err_t json_post_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
+static void wifi_event_handler(void* arg, esp_event_base_t event_base,
+    int32_t event_id, void* event_data) {
+    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+        wifi_connected = false;
+        esp_wifi_connect();
+        ESP_LOGI(TAG, "Tentando reconectar ao Wi-Fi...");
+    } 
+    else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
+        wifi_connected = true;
+        ESP_LOGI(TAG, "Conectado ao Wi-Fi com IP.");
+    }
+}
+
 // Constructor
 Communication::Communication() : alfa_d(0), y_d(0), server(nullptr) {
     singleton = this;
@@ -86,6 +128,17 @@ void Communication::wifi() {
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     esp_wifi_init(&cfg);
+
+    esp_event_handler_instance_register(WIFI_EVENT,
+                                        ESP_EVENT_ANY_ID,
+                                        &wifi_event_handler,
+                                        NULL,
+                                        NULL);
+    esp_event_handler_instance_register(IP_EVENT,
+                                        IP_EVENT_STA_GOT_IP,
+                                        &wifi_event_handler,
+                                        NULL,
+                                        NULL);
 
     wifi_config_t wifi_config = {};
     strcpy((char *)wifi_config.sta.ssid, WIFI_SSID);
@@ -153,4 +206,5 @@ void Communication::task(void *param) {
     while (true) {
         vTaskDelay(pdMS_TO_TICKS(100));
     }
+    xTaskCreatePinnedToCore(led_task, "led_task", 2048, NULL, 1, NULL, 1);
 }
