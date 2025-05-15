@@ -29,6 +29,10 @@ private:
     float kalman_unc_roll, kalman_unc_pitch;
     float last_roll, last_pitch;
     float roll_rate, pitch_rate;
+    float filt_roll_rate, filt_pitch_rate;
+    float kalman_rate_roll, kalman_rate_pitch;
+    float kalman_unc_rate_roll, kalman_unc_rate_pitch;
+
     bool verbose;
 
     static void task_imu(void* pvParams);

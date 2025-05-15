@@ -6,6 +6,8 @@
 #include "driver/ledc.h"
 #include "driver/pcnt.h"
 #include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include <string>
 
 class Motor {
@@ -35,7 +37,8 @@ private:
     int16_t _prev_pulses = 0;
     int16_t _curr_pulses = 0;
     float _velocity = 0.0f; // rad/s
-
+    float _prev_velocity = 0.5f; // rad/s
+    float _last_duty=0.0f;
     bool _verbose = false;
 };
 

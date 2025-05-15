@@ -14,6 +14,9 @@ IMU::IMU()
       kalman_unc_roll(4.0f), kalman_unc_pitch(4.0f),
       last_roll(0), last_pitch(0),
       roll_rate(0), pitch_rate(0),
+      filt_roll_rate(0), filt_pitch_rate(0),
+      kalman_rate_roll(0), kalman_rate_pitch(0),
+    kalman_unc_rate_roll(4.0f), kalman_unc_rate_pitch(4.0f),
       verbose(false) {}
 
 void IMU::set_verbose(bool v) {
@@ -51,20 +54,25 @@ void IMU::init() {
         return;
     }
 
-    // Verifica se já existe uma calibração feita
     uint8_t calibrated = 0;
     ret = nvs_get_u8(nvs_handle, "calibrated", &calibrated);
 
     if (ret == ESP_OK && calibrated == 1) {
-        // Já calibrado, então apenas carrega os dados
-        nvs_get_i32(nvs_handle, "rate_roll", reinterpret_cast<int32_t*>(&rate_roll));
-        nvs_get_i32(nvs_handle, "rate_pitch", reinterpret_cast<int32_t*>(&rate_pitch));
-        nvs_get_i32(nvs_handle, "rate_yaw", reinterpret_cast<int32_t*>(&rate_yaw));
+        size_t size = sizeof(float);
+        if (nvs_get_blob(nvs_handle, "rate_roll", &rate_roll, &size) != ESP_OK ||
+            nvs_get_blob(nvs_handle, "rate_pitch", &rate_pitch, &size) != ESP_OK ||
+            nvs_get_blob(nvs_handle, "rate_yaw", &rate_yaw, &size) != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to load calibration data. Resetting calibration flag.");
+            calibrated = 0;
+            nvs_set_u8(nvs_handle, "calibrated", 0);
+            nvs_commit(nvs_handle);
+        } else {
+            ESP_LOGI(TAG, "Loaded calibration from flash: roll=%.2f pitch=%.2f yaw=%.2f", rate_roll, rate_pitch, rate_yaw);
+        }
 
-        ESP_LOGI(TAG, "Loaded calibration from flash: roll=%.2f pitch=%.2f yaw=%.2f", rate_roll, rate_pitch, rate_yaw);
+    }
 
-    } else {
-        // Se não calibrado, roda a calibração agora
+    if (calibrated != 1) {
         ESP_LOGI(TAG, "No calibration found. Starting calibration...");
 
         float sum_roll = 0, sum_pitch = 0, sum_yaw = 0;
@@ -94,9 +102,9 @@ void IMU::init() {
         rate_yaw = sum_yaw / 2000;
 
         // Salva na NVS
-        nvs_set_i32(nvs_handle, "rate_roll", static_cast<int32_t>(rate_roll));
-        nvs_set_i32(nvs_handle, "rate_pitch", static_cast<int32_t>(rate_pitch));
-        nvs_set_i32(nvs_handle, "rate_yaw", static_cast<int32_t>(rate_yaw));
+        nvs_set_blob(nvs_handle, "rate_roll", &rate_roll, sizeof(float));
+        nvs_set_blob(nvs_handle, "rate_pitch", &rate_pitch, sizeof(float));
+        nvs_set_blob(nvs_handle, "rate_yaw", &rate_yaw, sizeof(float));
         nvs_set_u8(nvs_handle, "calibrated", 1);
         nvs_commit(nvs_handle);
 
@@ -127,6 +135,7 @@ void IMU::kalman_1d(float& state, float& uncertainty, float input, float measure
 void IMU::task_imu(void* pvParams) {
     IMU* imu = static_cast<IMU*>(pvParams);
     uint64_t last_time = esp_timer_get_time();
+    const float beta = 0.5f;      // tunável entre 0.8 e 0.99
 
     while (true) {
         uint8_t accel[6], gyro[6];
@@ -155,6 +164,12 @@ void IMU::task_imu(void* pvParams) {
         imu->kalman_1d(imu->kalman_roll, imu->kalman_unc_roll, imu->rate_roll, imu->angle_roll, imu->kalman_roll, imu->kalman_unc_roll);
         imu->kalman_1d(imu->kalman_pitch, imu->kalman_unc_pitch, imu->rate_pitch, imu->angle_pitch, imu->kalman_pitch, imu->kalman_unc_pitch);
 
+        imu->kalman_1d(imu->kalman_rate_roll, imu->kalman_unc_rate_roll,
+            0.0f, imu->rate_roll, imu->kalman_rate_roll, imu->kalman_unc_rate_roll);
+
+        imu->kalman_1d(imu->kalman_rate_pitch, imu->kalman_unc_rate_pitch,
+            0.0f, imu->rate_pitch, imu->kalman_rate_pitch, imu->kalman_unc_rate_pitch);
+
         // Derivadas
         uint64_t now = esp_timer_get_time();
         float dt = (now - last_time) / 1e6f; // segundos
@@ -164,9 +179,13 @@ void IMU::task_imu(void* pvParams) {
         imu->last_pitch = imu->kalman_pitch;
         last_time = now;
 
+        // filtro complementar na velocidade
+        imu->filt_roll_rate  = beta * imu->rate_roll  + (1 - beta) * imu->roll_rate;
+        imu->filt_pitch_rate = beta * imu->rate_pitch + (1 - beta) * imu->pitch_rate;
+
         if (imu->verbose) {
             ESP_LOGI(TAG, "Roll: %.2f, Pitch: %.2f | Roll_d: %.2f, Pitch_d: %.2f",
-                     imu->kalman_roll, imu->kalman_pitch, imu->roll_rate, imu->pitch_rate);
+                     imu->kalman_roll, imu->kalman_pitch, imu->kalman_rate_roll, imu->kalman_rate_pitch);
         }
 
         vTaskDelay(pdMS_TO_TICKS(PERIOD_MS));

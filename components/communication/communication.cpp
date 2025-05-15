@@ -13,8 +13,8 @@
 #include "driver/gpio.h"
 
 
-#define WIFI_SSID ""
-#define WIFI_PASS ""
+#define WIFI_SSID "APE 93"
+#define WIFI_PASS "jauaperi"
 static const char *TAG = "Communication";
 
 static Communication *singleton = nullptr;
