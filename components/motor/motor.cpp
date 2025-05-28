@@ -85,19 +85,21 @@ void Motor::begin() {
 
 void Motor::set_duty(float u) {
     if (u > 0) {
-        gpio_set_level(_in1Pin, 0);
-        gpio_set_level(_in2Pin, 1);
-    } else if (u < 0) {
         gpio_set_level(_in1Pin, 1);
         gpio_set_level(_in2Pin, 0);
+    } else if (u < 0) {
+        gpio_set_level(_in1Pin, 0);
+        gpio_set_level(_in2Pin, 1);
         u = -u;
     } else {
         gpio_set_level(_in1Pin, 0);
         gpio_set_level(_in2Pin, 0);
+        ledc_set_duty(LEDC_LOW_SPEED_MODE, _pwmChannel, 0);
+        ledc_update_duty(LEDC_LOW_SPEED_MODE, _pwmChannel);
     }
 
     u = std::fmin(u, 1.0f);
-    ledc_set_duty(LEDC_LOW_SPEED_MODE, _pwmChannel, static_cast<uint32_t>(4200 * u));
+    ledc_set_duty(LEDC_LOW_SPEED_MODE, _pwmChannel, static_cast<uint32_t>(8182 * u));
     ledc_update_duty(LEDC_LOW_SPEED_MODE, _pwmChannel);
 
     if (_verbose) {
@@ -120,7 +122,7 @@ void Motor::update_velocity() {
     }
 
     float rotacoes = static_cast<float>(delta) / (_pulsos_por_rotacao * 8); // quadratura ×4
-    _velocity = rotacoes * 2.0f * M_PI / 0.01f; // rad/s (100ms de intervalo)
+    _velocity = rotacoes * 2.0f * M_PI / 0.01f; // rad/s (10ms de intervalo)
 
     if (_verbose) {
         ESP_LOGI(TAG, "[%s] Pulsos: %d Velocidade: %.2f rad/s",

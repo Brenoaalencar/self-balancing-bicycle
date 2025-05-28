@@ -18,11 +18,12 @@ public:
     void set_verbose(bool v);
 
 private:
-    static constexpr int PERIOD_MS = 4;
+    static constexpr int PERIOD_MS = 10;
     static constexpr float GYRO_SCALE = 65.5f;
-    static constexpr float ACCEL_SCALE = 4096.0f;
+    static constexpr float ACCEL_SCALE = 16384.0f;
 
     float rate_roll, rate_pitch, rate_yaw;
+    float acc_offset_x, acc_offset_y, acc_offset_z;
     float acc_x, acc_y, acc_z;
     float angle_roll, angle_pitch;
     float kalman_roll, kalman_pitch;

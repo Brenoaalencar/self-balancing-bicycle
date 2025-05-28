@@ -35,8 +35,8 @@ void control_task(void *param) {
     constexpr float T = 0.01f;
 
     constexpr float K[2][7] = {
-        { -4.0f, -0.8f, -1.2f, -0.2f, -7.0f, 0.03f, -0.05f }, // u_vr
-        { -4.0f, -0.8f, 1.2f, 0.2f, -7.0f, -0.03f, -0.05f }  // u_vl
+        { 6.8224f,    0.5592f,    0.1493f,    0.0006f,   -3.2438f,   -0.0007f,    0.0006f }, // u_vr
+        { 6.8224f,    0.5592f,   -0.1493f,   -0.0006f,   -3.2438f,    0.0007f,    0.0006f }  // u_vl
     };
 
     TickType_t last_wake_time = xTaskGetTickCount();
@@ -48,8 +48,8 @@ void control_task(void *param) {
         float vl = left_motor->get_velocity();
         float vr = right_motor->get_velocity();
 
-        float teta = imu->roll() * M_PI/180;
-        float teta_d = imu->roll_d() * M_PI/180;
+        float teta = -imu->roll() * M_PI/180;
+        float teta_d = -imu->roll_d() * M_PI/180;
 
         comm->get_setpoint(alfa_r, y_r);
 
@@ -80,6 +80,12 @@ void control_task(void *param) {
 
         u_vr = clamp(u_vr, -1.0f, 1.0f);
         u_vl = clamp(u_vl, -1.0f, 1.0f);
+
+        // Log dos valores de controle e vetor de estado
+        ESP_LOGI("CONTROL", "u_vl: %.4f, u_vr: %.4f, x: [%.4f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f]",
+            u_vl, u_vr,
+            x[0], x[1], x[2], x[3], x[4], x[5], x[6]
+        );
 
         left_motor->set_duty(u_vl);
         right_motor->set_duty(u_vr);
