@@ -99,7 +99,7 @@ void Motor::set_duty(float u) {
     }
 
     u = std::fmin(u, 1.0f);
-    ledc_set_duty(LEDC_LOW_SPEED_MODE, _pwmChannel, static_cast<uint32_t>(8182 * u));
+    ledc_set_duty(LEDC_LOW_SPEED_MODE, _pwmChannel, static_cast<uint32_t>(8192 * u));
     ledc_update_duty(LEDC_LOW_SPEED_MODE, _pwmChannel);
 
     if (_verbose) {
@@ -121,7 +121,7 @@ void Motor::update_velocity() {
         _prev_pulses = _curr_pulses;
     }
 
-    float rotacoes = static_cast<float>(delta) / (_pulsos_por_rotacao * 8); // quadratura ×4
+    float rotacoes = static_cast<float>(delta) / (_pulsos_por_rotacao); // quadratura ×4
     _velocity = rotacoes * 2.0f * M_PI / 0.01f; // rad/s (10ms de intervalo)
 
     if (_verbose) {

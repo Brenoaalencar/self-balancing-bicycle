@@ -35,8 +35,8 @@ void control_task(void *param) {
     constexpr float T = 0.01f;
 
     constexpr float K[2][7] = {
-        { 6.8224f,    0.5592f,    0.1493f,    0.0006f,   -3.2438f,   -0.0007f,    0.0006f }, // u_vr
-        { 6.8224f,    0.5592f,   -0.1493f,   -0.0006f,   -3.2438f,    0.0007f,    0.0006f }  // u_vl
+        { 7.014083355278225f,   0.597755525463435f,   0.665560967008112f,   0.009150006651639f, -3.265522897898713f,  -0.012914774343736f,   0.016832704626618 }, // u_vr
+        { 7.014083355278217f,   0.597755525463435f,  -0.665560967008094f,  -0.009150006651639f, -3.265522897898709f,   0.012914774343735f,   0.016832704626617 }  // u_vl
     };
 
     TickType_t last_wake_time = xTaskGetTickCount();
@@ -82,10 +82,7 @@ void control_task(void *param) {
         u_vl = clamp(u_vl, -1.0f, 1.0f);
 
         // Log dos valores de controle e vetor de estado
-        ESP_LOGI("CONTROL", "u_vl: %.4f, u_vr: %.4f, x: [%.4f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f]",
-            u_vl, u_vr,
-            x[0], x[1], x[2], x[3], x[4], x[5], x[6]
-        );
+        //ESP_LOGI("CONTROL", "u_vl: %.4f, u_vr: %.4f, x: [%.4f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f]",u_vl, u_vr, x[0], x[1], x[2], x[3], x[4], x[5], x[6]);
 
         left_motor->set_duty(u_vl);
         right_motor->set_duty(u_vr);
@@ -122,11 +119,11 @@ extern "C" void app_main() {
     //xTaskCreate(monitor_task, "monitor_task", 4096, &comm, 4, NULL);
 
     // Motores
-    static Motor right_motor(GPIO_NUM_4, GPIO_NUM_15, 470, "RIGHT",
+    static Motor right_motor(GPIO_NUM_4, GPIO_NUM_15, 2024, "RIGHT",
                             GPIO_NUM_33, LEDC_CHANNEL_0, LEDC_TIMER_0,
-                            GPIO_NUM_26, GPIO_NUM_25);
+                            GPIO_NUM_26, GPIO_NUM_25); //2112 = 11 * 4 * 46
 
-    static Motor left_motor(GPIO_NUM_16, GPIO_NUM_17, 470, "LEFT",
+    static Motor left_motor(GPIO_NUM_16, GPIO_NUM_17, 2024, "LEFT",
                              GPIO_NUM_13, LEDC_CHANNEL_1, LEDC_TIMER_0,
                              GPIO_NUM_14, GPIO_NUM_12);
 
@@ -142,10 +139,10 @@ extern "C" void app_main() {
 
     xTaskCreate(control_task, "control_task", 8192, &control_args, 6, NULL);
     // Teste PWM
-    //right_motor.set_duty(4539);
-    //while(1){
+    // right_motor.set_duty(0.7461); //para 6.28 rad/s com 5V da USB (1 rotação/s)
+    // while(1){
     //    right_motor.update_velocity();
     //    vTaskDelay(pdMS_TO_TICKS(10));
-    //}
+    // }
     
 }
