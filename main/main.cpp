@@ -81,8 +81,19 @@ void control_task(void *param) {
         u_vr = clamp(u_vr, -1.0f, 1.0f);
         u_vl = clamp(u_vl, -1.0f, 1.0f);
 
-        // Log dos valores de controle e vetor de estado
-        //ESP_LOGI("CONTROL", "u_vl: %.4f, u_vr: %.4f, x: [%.4f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f]",u_vl, u_vr, x[0], x[1], x[2], x[3], x[4], x[5], x[6]);
+        // Send telemetry data instead of logging
+        TelemetryData telemetry = {
+            .teta = teta,
+            .teta_d = teta_d,
+            .alfa = alfa,
+            .alfa_d = alfa_d,
+            .y_d = y_d,
+            .e_alpha_i = e_alpha_i,
+            .e_y_i = e_y_i,
+            .u_vl = u_vl,
+            .u_vr = u_vr
+        };
+        comm->set_telemetry(telemetry);
 
         left_motor->set_duty(u_vl);
         right_motor->set_duty(u_vr);

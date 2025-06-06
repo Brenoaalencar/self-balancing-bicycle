@@ -13,8 +13,8 @@
 #include "driver/gpio.h"
 
 
-#define WIFI_SSID "APE 93"
-#define WIFI_PASS "jauaperi"
+#define WIFI_SSID ""
+#define WIFI_PASS ""
 static const char *TAG = "Communication";
 
 static Communication *singleton = nullptr;
@@ -116,6 +116,36 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
     }
 }
 
+// Add after the existing handlers
+static esp_err_t telemetry_handler(httpd_req_t *req) {
+    if (!singleton) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Server not initialized");
+        return ESP_FAIL;
+    }
+
+    TelemetryData data;
+    singleton->get_telemetry(data);
+
+    cJSON *json = cJSON_CreateObject();
+    cJSON_AddNumberToObject(json, "teta", data.teta);
+    cJSON_AddNumberToObject(json, "teta_d", data.teta_d);
+    cJSON_AddNumberToObject(json, "alfa", data.alfa);
+    cJSON_AddNumberToObject(json, "alfa_d", data.alfa_d);
+    cJSON_AddNumberToObject(json, "y_d", data.y_d);
+    cJSON_AddNumberToObject(json, "e_alpha_i", data.e_alpha_i);
+    cJSON_AddNumberToObject(json, "e_y_i", data.e_y_i);
+    cJSON_AddNumberToObject(json, "u_vl", data.u_vl);
+    cJSON_AddNumberToObject(json, "u_vr", data.u_vr);
+
+    char *json_str = cJSON_Print(json);
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, json_str);
+    
+    free(json_str);
+    cJSON_Delete(json);
+    return ESP_OK;
+}
+
 // Constructor
 Communication::Communication() : alfa_d(0), y_d(0), server(nullptr) {
     singleton = this;
@@ -181,6 +211,13 @@ void Communication::begin() {
             .handler = json_post_handler
         };
         httpd_register_uri_handler(server, &json_uri);
+
+        httpd_uri_t telemetry_uri = {
+            .uri = "/telemetry",
+            .method = HTTP_GET,
+            .handler = telemetry_handler
+        };
+        httpd_register_uri_handler(server, &telemetry_uri);
     }
 }
 
@@ -196,6 +233,18 @@ void Communication::get_setpoint(double &a, double &y) {
     a = alfa_d;
     y = y_d;
     portEXIT_CRITICAL(&mux);
+}
+
+void Communication::set_telemetry(const TelemetryData& data) {
+    portENTER_CRITICAL(&telemetry_mux);
+    telemetry_data = data;
+    portEXIT_CRITICAL(&telemetry_mux);
+}
+
+void Communication::get_telemetry(TelemetryData& data) {
+    portENTER_CRITICAL(&telemetry_mux);
+    data = telemetry_data;
+    portEXIT_CRITICAL(&telemetry_mux);
 }
 
 void Communication::task(void *param) {

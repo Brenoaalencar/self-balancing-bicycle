@@ -5,10 +5,12 @@
 #include <cmath>
 
 static const char* TAG = "IMU";
-constexpr float DEADZONE_THRESHOLD = 0.05f; // rad/s
+constexpr float DEADZONE_THRESHOLD = 0.02f; // Reduzido para 0.02 rad/s para maior sensibilidade
 constexpr float DT = 0.01f; // 10 ms
-constexpr float ACCEL_UNCERTAINTY = 3.0f;
-constexpr float GYRO_UNCERTAINTY = 4.0f;
+constexpr float ACCEL_UNCERTAINTY = 2.0f; // Reduzido para maior confiança no acelerômetro
+constexpr float GYRO_UNCERTAINTY = 3.0f; // Reduzido para maior confiança no giroscópio
+constexpr float PROCESS_NOISE = 0.001f; // Adicionado ruído do processo
+constexpr float MEASUREMENT_NOISE = 0.1f; // Adicionado ruído da medição
 
 IMU::IMU()
     : rate_roll(0), rate_pitch(0), rate_yaw(0),
@@ -21,7 +23,14 @@ IMU::IMU()
       filt_roll_rate(0), filt_pitch_rate(0),
       kalman_rate_roll(0), kalman_rate_pitch(0),
       kalman_unc_rate_roll(4.0f), kalman_unc_rate_pitch(4.0f),
-      verbose(false) {}
+      verbose(false),
+      last_temperature(25.0f),
+      TEMP_COEFFICIENT(0.01f) {
+    for (int i = 0; i < WINDOW_SIZE; i++) {
+        roll_history[i] = 0;
+        pitch_history[i] = 0;
+    }
+}
 
 void IMU::set_verbose(bool v) {
     verbose = v;
@@ -156,19 +165,38 @@ float IMU::pitch_d() const { return kalman_rate_pitch; }
 
 void IMU::kalman_1d(float& state, float& uncertainty, float input, float measurement,
                     float& output, float& out_uncertainty) {
+    // Predição
     state += DT * input;
-    uncertainty += pow(DT * GYRO_UNCERTAINTY, 2);
-    float gain = uncertainty / (uncertainty + pow(ACCEL_UNCERTAINTY, 2));
-    state += gain * (measurement - state);
-    uncertainty *= (1 - gain);
+    uncertainty += DT * DT * PROCESS_NOISE;
+    
+    // Atualização
+    float kalman_gain = uncertainty / (uncertainty + MEASUREMENT_NOISE);
+    state += kalman_gain * (measurement - state);
+    uncertainty = (1 - kalman_gain) * uncertainty;
+    
     output = state;
     out_uncertainty = uncertainty;
+}
+
+float IMU::moving_average(float* history, float new_value) {
+    history[history_index] = new_value;
+    float sum = 0;
+    for(int i = 0; i < WINDOW_SIZE; i++) {
+        sum += history[i];
+    }
+    return sum / WINDOW_SIZE;
+}
+
+float IMU::compensate_temperature(float value, float temperature) {
+    float temp_diff = temperature - last_temperature;
+    last_temperature = temperature;
+    return value * (1.0f - TEMP_COEFFICIENT * temp_diff);
 }
 
 void IMU::task_imu(void* pvParams) {
     IMU* imu = static_cast<IMU*>(pvParams);
     uint64_t last_time = esp_timer_get_time();
-    const float beta = 0.5f;
+    const float beta = 0.7f; // Aumentado para dar mais peso aos dados mais recentes
 
     while (true) {
         uint8_t accel[6], gyro[6];
@@ -187,9 +215,16 @@ void IMU::task_imu(void* pvParams) {
         imu->acc_y = ay / ACCEL_SCALE - imu->acc_offset_y;
         imu->acc_z = az / ACCEL_SCALE - imu->acc_offset_z;
 
-        imu->rate_roll = (gx / GYRO_SCALE) - imu->rate_roll;
-        imu->rate_pitch = (gy / GYRO_SCALE) - imu->rate_pitch;
-        imu->rate_yaw = (gz / GYRO_SCALE) - imu->rate_yaw;
+        // Ler temperatura
+        uint8_t temp[2];
+        mpu9250_register_read(0x41, temp, 2);
+        int16_t raw_temp = (temp[0] << 8) | temp[1];
+        float temperature = (raw_temp / 340.0f) + 36.53f;
+
+        // Aplicar compensação de temperatura
+        imu->rate_roll = imu->compensate_temperature(gx / GYRO_SCALE, temperature) - imu->rate_roll;
+        imu->rate_pitch = imu->compensate_temperature(gy / GYRO_SCALE, temperature) - imu->rate_pitch;
+        imu->rate_yaw = imu->compensate_temperature(gz / GYRO_SCALE, temperature) - imu->rate_yaw;
 
         imu->angle_roll = atan(imu->acc_y / sqrtf(imu->acc_x * imu->acc_x + imu->acc_z * imu->acc_z)) * 180.0f / M_PI;
         imu->angle_pitch = -atan(imu->acc_x / sqrtf(imu->acc_y * imu->acc_y + imu->acc_z * imu->acc_z)) * 180.0f / M_PI;
@@ -202,6 +237,12 @@ void IMU::task_imu(void* pvParams) {
 
         imu->kalman_1d(imu->kalman_rate_pitch, imu->kalman_unc_rate_pitch,
                        0.0f, imu->rate_pitch, imu->kalman_rate_pitch, imu->kalman_unc_rate_pitch);
+
+        // Aplicar filtro de média móvel
+        imu->kalman_roll = imu->moving_average(imu->roll_history, imu->kalman_roll);
+        imu->kalman_pitch = imu->moving_average(imu->pitch_history, imu->kalman_pitch);
+        
+        imu->history_index = (imu->history_index + 1) % WINDOW_SIZE;
 
         uint64_t now = esp_timer_get_time();
         float dt = (now - last_time) / 1e6f;

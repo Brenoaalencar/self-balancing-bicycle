@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bicicleta Auto-Equilibrada</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .telemetry-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .telemetry-item {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
+        }
+        .telemetry-label {
+            font-weight: bold;
+            color: #495057;
+        }
+        .telemetry-value {
+            color: #212529;
+            font-family: monospace;
+        }
+        #joystick {
+            width: 200px;
+            height: 200px;
+            background-color: #e9ecef;
+            border-radius: 50%;
+            position: relative;
+            margin: 20px auto;
+            touch-action: none;
+        }
+        #joystick-knob {
+            width: 50px;
+            height: 50px;
+            background-color: #007bff;
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            cursor: move;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Telemetria da Bicicleta</h1>
+        
+        <div class="telemetry-grid">
+            <div class="telemetry-item">
+                <span class="telemetry-label">Ângulo (θ):</span>
+                <span class="telemetry-value" id="teta">0.0000</span>
+            </div>
+            <div class="telemetry-item">
+                <span class="telemetry-label">Velocidade Angular (θ'):</span>
+                <span class="telemetry-value" id="teta_d">0.0000</span>
+            </div>
+            <div class="telemetry-item">
+                <span class="telemetry-label">Ângulo de Direção (α):</span>
+                <span class="telemetry-value" id="alfa">0.0000</span>
+            </div>
+            <div class="telemetry-item">
+                <span class="telemetry-label">Velocidade de Direção (α'):</span>
+                <span class="telemetry-value" id="alfa_d">0.0000</span>
+            </div>
+            <div class="telemetry-item">
+                <span class="telemetry-label">Posição (y):</span>
+                <span class="telemetry-value" id="y_d">0.0000</span>
+            </div>
+            <div class="telemetry-item">
+                <span class="telemetry-label">Erro Integral α:</span>
+                <span class="telemetry-value" id="e_alpha_i">0.0000</span>
+            </div>
+            <div class="telemetry-item">
+                <span class="telemetry-label">Erro Integral y:</span>
+                <span class="telemetry-value" id="e_y_i">0.0000</span>
+            </div>
+            <div class="telemetry-item">
+                <span class="telemetry-label">Controle Motor Esquerdo:</span>
+                <span class="telemetry-value" id="u_vl">0.0000</span>
+            </div>
+            <div class="telemetry-item">
+                <span class="telemetry-label">Controle Motor Direito:</span>
+                <span class="telemetry-value" id="u_vr">0.0000</span>
+            </div>
+        </div>
+
+        <div id="joystick">
+            <div id="joystick-knob"></div>
+        </div>
+    </div>
+
+    <script>
+        // Função para atualizar a telemetria
+        function updateTelemetry() {
+            fetch('/telemetry')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('teta').textContent = data.teta.toFixed(4);
+                    document.getElementById('teta_d').textContent = data.teta_d.toFixed(4);
+                    document.getElementById('alfa').textContent = data.alfa.toFixed(4);
+                    document.getElementById('alfa_d').textContent = data.alfa_d.toFixed(4);
+                    document.getElementById('y_d').textContent = data.y_d.toFixed(4);
+                    document.getElementById('e_alpha_i').textContent = data.e_alpha_i.toFixed(4);
+                    document.getElementById('e_y_i').textContent = data.e_y_i.toFixed(4);
+                    document.getElementById('u_vl').textContent = data.u_vl.toFixed(4);
+                    document.getElementById('u_vr').textContent = data.u_vr.toFixed(4);
+                })
+                .catch(error => console.error('Erro ao buscar telemetria:', error));
+        }
+
+        // Atualiza a telemetria a cada 100ms
+        setInterval(updateTelemetry, 100);
+
+        // Implementação do joystick
+        const joystick = document.getElementById('joystick');
+        const knob = document.getElementById('joystick-knob');
+        let isDragging = false;
+        let startX, startY;
+        let currentX = 0, currentY = 0;
+
+        function updateKnobPosition(x, y) {
+            const joystickRect = joystick.getBoundingClientRect();
+            const knobRect = knob.getBoundingClientRect();
+            const centerX = joystickRect.width / 2;
+            const centerY = joystickRect.height / 2;
+            
+            // Calcula a distância do centro
+            const deltaX = x - centerX;
+            const deltaY = y - centerY;
+            const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+            const maxDistance = centerX - knobRect.width / 2;
+            
+            // Normaliza a posição
+            let normalizedX = deltaX;
+            let normalizedY = deltaY;
+            
+            if (distance > maxDistance) {
+                normalizedX = (deltaX / distance) * maxDistance;
+                normalizedY = (deltaY / distance) * maxDistance;
+            }
+            
+            // Atualiza a posição do knob
+            knob.style.transform = `translate(${normalizedX}px, ${normalizedY}px)`;
+            
+            // Envia os comandos para o servidor
+            const commandX = normalizedX / maxDistance;
+            const commandY = normalizedY / maxDistance;
+            
+            fetch('/movement', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    command: 'movement',
+                    value: [commandX, commandY]
+                })
+            });
+        }
+
+        function handleStart(e) {
+            isDragging = true;
+            const touch = e.touches ? e.touches[0] : e;
+            startX = touch.clientX;
+            startY = touch.clientY;
+            e.preventDefault();
+        }
+
+        function handleMove(e) {
+            if (!isDragging) return;
+            const touch = e.touches ? e.touches[0] : e;
+            const x = touch.clientX - joystick.getBoundingClientRect().left;
+            const y = touch.clientY - joystick.getBoundingClientRect().top;
+            updateKnobPosition(x, y);
+            e.preventDefault();
+        }
+
+        function handleEnd() {
+            isDragging = false;
+            knob.style.transform = 'translate(-50%, -50%)';
+            // Envia comando de parada
+            fetch('/movement', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    command: 'movement',
+                    value: [0, 0]
+                })
+            });
+        }
+
+        // Eventos de mouse
+        knob.addEventListener('mousedown', handleStart);
+        document.addEventListener('mousemove', handleMove);
+        document.addEventListener('mouseup', handleEnd);
+
+        // Eventos de touch
+        knob.addEventListener('touchstart', handleStart);
+        document.addEventListener('touchmove', handleMove);
+        document.addEventListener('touchend', handleEnd);
+    </script>
+</body>
+</html> 
