@@ -11,7 +11,7 @@ constexpr float ACCEL_UNCERTAINTY = 3.0f;
 constexpr float GYRO_UNCERTAINTY = 4.0f;
 
 IMU::IMU()
-    : rate_roll(0), rate_pitch(0), rate_yaw(0),
+    : offset_rate_roll(0), offset_rate_pitch(0), offset_rate_yaw(0),
       acc_x(0), acc_y(0), acc_z(0),
       angle_roll(0), angle_pitch(0),
       kalman_roll(0), kalman_pitch(0),
@@ -124,17 +124,17 @@ void IMU::init() {
             vTaskDelay(1 / portTICK_PERIOD_MS);
         }
 
-        rate_roll = sum_roll / 2000;
-        rate_pitch = sum_pitch / 2000;
-        rate_yaw = sum_yaw / 2000;
+        offset_rate_roll = sum_roll / 2000;
+        offset_rate_pitch = sum_pitch / 2000;
+        offset_rate_yaw = sum_yaw / 2000;
 
         acc_offset_x = sum_ax / 2000;
         acc_offset_y = sum_ay / 2000;
         acc_offset_z = (sum_az / 2000) - 1.0f; // Ajuste para gravidade
 
-        nvs_set_blob(nvs_handle, "rate_roll", &rate_roll, sizeof(float));
-        nvs_set_blob(nvs_handle, "rate_pitch", &rate_pitch, sizeof(float));
-        nvs_set_blob(nvs_handle, "rate_yaw", &rate_yaw, sizeof(float));
+        nvs_set_blob(nvs_handle, "rate_roll", &offset_rate_roll, sizeof(float));
+        nvs_set_blob(nvs_handle, "rate_pitch", &offset_rate_pitch, sizeof(float));
+        nvs_set_blob(nvs_handle, "rate_yaw", &offset_rate_yaw, sizeof(float));
         nvs_set_blob(nvs_handle, "acc_x", &acc_offset_x, sizeof(float));
         nvs_set_blob(nvs_handle, "acc_y", &acc_offset_y, sizeof(float));
         nvs_set_blob(nvs_handle, "acc_z", &acc_offset_z, sizeof(float));
@@ -187,9 +187,9 @@ void IMU::task_imu(void* pvParams) {
         imu->acc_y = ay / ACCEL_SCALE - imu->acc_offset_y;
         imu->acc_z = az / ACCEL_SCALE - imu->acc_offset_z;
 
-        imu->rate_roll = (gx / GYRO_SCALE) - imu->rate_roll;
-        imu->rate_pitch = (gy / GYRO_SCALE) - imu->rate_pitch;
-        imu->rate_yaw = (gz / GYRO_SCALE) - imu->rate_yaw;
+        imu->rate_roll = (gx / GYRO_SCALE) - imu->offset_rate_roll;
+        imu->rate_pitch = (gy / GYRO_SCALE) - imu->offset_rate_pitch;
+        imu->rate_yaw = (gz / GYRO_SCALE) - imu->offset_rate_yaw;
 
         imu->angle_roll = atan(imu->acc_y / sqrtf(imu->acc_x * imu->acc_x + imu->acc_z * imu->acc_z)) * 180.0f / M_PI;
         imu->angle_pitch = -atan(imu->acc_x / sqrtf(imu->acc_y * imu->acc_y + imu->acc_z * imu->acc_z)) * 180.0f / M_PI;

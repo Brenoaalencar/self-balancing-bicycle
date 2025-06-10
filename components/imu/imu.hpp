@@ -22,9 +22,10 @@ private:
     static constexpr float GYRO_SCALE = 65.5f;
     static constexpr float ACCEL_SCALE = 16384.0f;
 
-    float rate_roll, rate_pitch, rate_yaw;
+    float offset_rate_roll, offset_rate_pitch, offset_rate_yaw;
     float acc_offset_x, acc_offset_y, acc_offset_z;
     float acc_x, acc_y, acc_z;
+    float rate_roll, rate_pitch, rate_yaw;
     float angle_roll, angle_pitch;
     float kalman_roll, kalman_pitch;
     float kalman_unc_roll, kalman_unc_pitch;

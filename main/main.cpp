@@ -35,8 +35,8 @@ void control_task(void *param) {
     constexpr float T = 0.01f;
 
     constexpr float K[2][7] = {
-        { 6.859206811250713f, 0.566228709799539f, 0.289866184366738f, 0.001625204976413f, -3.186938121705327f, -0.002155071993113f, 0.001822733100862 }, // u_vr
-        { 6.859206811250788f, 0.566228709799545f, -0.289866184366740f, -0.001625204976413f, -3.186938121705361f, 0.002155071993113f, 0.001822733100862 }  // u_vl
+        { 7.301314863921826f, 0.601254578169857f, 0.049670216419073f, 0.000206834664372f, -3.604097791725348f, -0.000070559815914f, 0.000060802615897f }, // u_vr
+        { 7.301314863921966f, 0.601254578169868f, -0.049670216419349f, -0.000206834664371f, -3.604097791725418f, 0.000070559815915f, 0.000060802615897f }  // u_vl
     };
 
     TickType_t last_wake_time = xTaskGetTickCount();
@@ -77,12 +77,17 @@ void control_task(void *param) {
             u_vr -= K[0][i] * x[i];
             u_vl -= K[1][i] * x[i];
         }
-
-        u_vr = clamp(u_vr, -1.0f, 1.0f);
-        u_vl = clamp(u_vl, -1.0f, 1.0f);
+        
+        if (fabsf(imu->roll()) > 30) {
+            u_vr = 0.0f;
+            u_vl = 0.0f;
+        } else {
+            u_vr = clamp(u_vr, -1.0f, 1.0f);
+            u_vl = clamp(u_vl, -1.0f, 1.0f);
+        }
 
         // Log dos valores de controle e vetor de estado
-        ESP_LOGI("CONTROL", "u_vl: %.4f, u_vr: %.4f, x: [%.4f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f]",u_vl, u_vr, x[0], x[1], x[2], x[3], x[4], x[5], x[6]);
+        //ESP_LOGI("CONTROL", "u_vl: %.4f, u_vr: %.4f, x: [%.4f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f]",u_vl, u_vr, x[0], x[1], x[2], x[3], x[4], x[5], x[6]);
 
         left_motor->set_duty(u_vl);
         right_motor->set_duty(u_vr);
@@ -102,7 +107,7 @@ extern "C" void app_main() {
     // IMU
     static IMU imu;
     imu.init();
-    imu.set_verbose(false);
+    imu.set_verbose(true);
 
     // Comunicação
     static Communication comm;
