@@ -43,6 +43,9 @@ private:
     float _velocity = 0.0f;     // filtrada
     float _velocity_raw = 0.0f; // bruta (sem filtro)
 
+    //Deslocamento
+    float _deslocamento = 0.0f; 
+
     // Tempo
     int64_t _last_time = 0;     // microssegundos
 

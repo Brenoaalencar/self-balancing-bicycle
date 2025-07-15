@@ -88,6 +88,8 @@ void Motor::begin() {
     _velocity_raw = 0;
     _total_pulses = 0;
     _prev_pulses = 0;
+    _deslocamento = 0.0f;
+
 }
 
 void Motor::set_duty(float u) {
@@ -131,6 +133,11 @@ void Motor::update_velocity() {
 
     _total_pulses += delta;
 
+    float rotacoes_incrementais = static_cast<float>(delta) / _pulsos_por_rotacao;
+    float graus_incrementais = rotacoes_incrementais * 360.0f;
+    _deslocamento += graus_incrementais;
+
+
     int64_t now = esp_timer_get_time();  // microssegundos
     float dt = (now - _last_time) / 1e6f;  // segundos
     _last_time = now;
@@ -143,7 +150,7 @@ void Motor::update_velocity() {
     _velocity = alpha * _velocity_raw + (1.0f - alpha) * _velocity;
     
     if (_verbose) {
-        ESP_LOGI(TAG, "[%s] Pulsos: %d Velocidade: %.2f rad/s", _nome.c_str(), delta, _velocity);
+        ESP_LOGI(TAG, "[%s] Pulsos: %d Velocidade: %.2f rad/s Deslocamento: %.2f graus", _nome.c_str(), delta, _velocity, _deslocamento);
     }
 }
 
