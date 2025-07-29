@@ -35,8 +35,8 @@ void control_task(void *param) {
     constexpr float T = 0.01f;
 
     constexpr float K[2][7] = {
-        { 5.714007910536195f, 0.490012733326365f, 0.989496224689008f, 0.003447237128677f, -4.566936806915003f, -0.021747443800100f, 0.055329189650306f }, // u_vr
-        { 5.714007910536274f, 0.490012733326371f, -0.989496224689112f, -0.003447237128677f, -4.566936806915066f, 0.021747443800105f, 0.055329189650309f }  // u_vl
+        { -1.817989808026989f, -0.151788795194102f, -0.042895394515624f, -0.000217862003832f, -3.194066132821282f, 0.000000706103507f, 0.0f }, // u_vr
+        { -1.817989808027428f, -0.151788795194139f, 0.042895394516139f, 0.000217862003834f, -3.194066132822059f, -0.000000706103507f, 0.0f }  // u_vl
     };
 
     TickType_t last_wake_time = xTaskGetTickCount();
@@ -48,12 +48,12 @@ void control_task(void *param) {
         float vl = left_motor->get_velocity();
         float vr = right_motor->get_velocity();
 
-        float teta = -imu->roll() * M_PI/180;
-        float teta_d = -imu->roll_d() * M_PI/180;
+        float teta = imu->roll() * M_PI/180;
+        float teta_d = imu->roll_d() * M_PI/180;
 
         comm->get_setpoint(alfa_r, y_r);
 
-        float alfa_d = ((vr - vl) / 2.0f) * (R / D);
+        float alfa_d = (-vr + vl) * (R / D);
         float y_d = ((vr + vl) / 2.0f) * R;
         float alfa = alfa_0 + alfa_d * T;
         alfa_0 = alfa;

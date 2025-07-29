@@ -108,7 +108,7 @@ void Motor::set_duty(float u) {
         return;
     }
 
-    u = std::fmin(u, 1.0f);
+    //u = std::fmin(u, 1.0f);
     ledc_set_duty(LEDC_LOW_SPEED_MODE, _pwmChannel, static_cast<uint32_t>(8192 * u));
     ledc_update_duty(LEDC_LOW_SPEED_MODE, _pwmChannel);
 
